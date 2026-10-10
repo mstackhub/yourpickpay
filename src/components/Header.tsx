@@ -56,22 +56,11 @@ export default function Header() {
           <div className="flex items-center gap-2 sm:gap-4">
             <Link
               href="/"
-              className="hidden sm:flex items-center gap-1.5 text-xs font-bold text-zinc-700 hover:text-black px-3.5 py-2 rounded-lg hover:bg-zinc-100 transition-colors"
+              className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-zinc-800 hover:text-black px-4 py-2 rounded-xl hover:bg-zinc-100 transition-colors"
             >
-              <ShoppingBag className="w-3.5 h-3.5" />
+              <ShoppingBag className="w-4 h-4 text-zinc-700" />
               <span>แคตตาล็อกสินค้า</span>
             </Link>
-
-            {/* Line OA Quick Button */}
-            <a
-              href={lineUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-3.5 sm:px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs hover:shadow-md transition-all active:scale-95"
-            >
-              <MessageCircle className="w-3.5 h-3.5 fill-white" />
-              <span>สอบถาม / เปิดสัญญา LINE</span>
-            </a>
           </div>
 
         </div>
