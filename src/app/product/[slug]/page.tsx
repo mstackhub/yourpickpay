@@ -7,6 +7,7 @@ import { useStore } from '@/lib/store';
 import InstallmentCalculatorWidget from '@/components/InstallmentCalculatorWidget';
 import SalePageRenderer from '@/components/SalePageRenderer';
 import ProductCard from '@/components/ProductCard';
+import FormattedDescription from '@/components/FormattedDescription';
 import { 
   ChevronRight, 
   ShieldCheck, 
@@ -141,10 +142,7 @@ export default function ProductDetailPage() {
 
             {/* Product description */}
             {product.description && (
-              <div className="bg-zinc-50 p-5 border border-zinc-200 text-xs sm:text-sm text-zinc-700 leading-relaxed font-normal">
-                <span className="font-bold text-black block mb-1">เกี่ยวกับสินค้านี้</span>
-                {product.description}
-              </div>
+              <FormattedDescription text={product.description} />
             )}
           </div>
 
