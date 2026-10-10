@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import { Product, InstallmentFrequency } from '@/types';
 import { useStore } from '@/lib/store';
-import { calculateInstallment, getApplicablePlans, getFrequencyThaiLabel } from '@/lib/installmentEngine';
+import { calculateInstallment, getApplicablePlans, getFrequencyThaiLabel, resolveProductDownPayment } from '@/lib/installmentEngine';
 import { 
   Copy, 
   Check, 
@@ -24,6 +24,11 @@ export default function InstallmentCalculatorWidget({ product, className = '', i
   const applicablePlans = useMemo(() => {
     return getApplicablePlans(product, allGlobalPlans);
   }, [product, allGlobalPlans]);
+
+  // Resolve Down Payment
+  const downPayment = useMemo(() => {
+    return resolveProductDownPayment(product, settings);
+  }, [product, settings]);
 
   // Selected duration months (2, 3, 6, 12)
   const [selectedDuration, setSelectedDuration] = useState<number>(() => {
@@ -68,11 +73,16 @@ export default function InstallmentCalculatorWidget({ product, className = '', i
   // Calculate results
   const calculation = useMemo(() => {
     if (!activePlan) return null;
-    return calculateInstallment(product.original_price, activePlan, {
-      sku: product.sku,
-      name: product.name
-    });
-  }, [product, activePlan]);
+    return calculateInstallment(
+      product.original_price,
+      activePlan,
+      {
+        sku: product.sku,
+        name: product.name
+      },
+      downPayment
+    );
+  }, [product, activePlan, downPayment]);
 
   const handleCopy = async () => {
     if (!calculation) return;
@@ -115,6 +125,25 @@ export default function InstallmentCalculatorWidget({ product, className = '', i
       <div className="text-2xl sm:text-3xl font-black text-black mt-2">
         ฿{product.original_price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
       </div>
+
+      {/* Down payment info badge if applicable */}
+      {calculation && calculation.down_payment_amount > 0 && (
+        <div className="mt-3 p-3 bg-zinc-50 border border-zinc-200 flex items-center justify-between text-xs">
+          <div>
+            <span className="text-zinc-500 font-medium">เงินดาวน์: </span>
+            <span className="font-black text-black">
+              ฿{calculation.down_payment_amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {downPayment.type === 'percentage' && ` (${downPayment.value}%)`}
+            </span>
+          </div>
+          <div>
+            <span className="text-zinc-500 font-medium">ยอดจัดผ่อน: </span>
+            <span className="font-black text-black">
+              ฿{calculation.financed_amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* 3. Section: ระยะเวลาผ่อน (Radio List) */}
       <div className="mt-6 pt-4 border-t border-zinc-100">

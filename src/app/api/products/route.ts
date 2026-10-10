@@ -21,6 +21,9 @@ export async function GET() {
       original_price: Number(row.original_price),
       images: row.images ? JSON.parse(row.images) : [],
       description: row.description,
+      down_payment_mode: row.down_payment_mode || 'default',
+      down_payment_type: row.down_payment_type || 'percentage',
+      down_payment_value: Number(row.down_payment_value) || 0,
       status: row.status,
       seo_title: row.seo_title,
       seo_description: row.seo_description,
@@ -49,10 +52,11 @@ export async function POST(req: Request) {
 
     await turso.execute({
       sql: `INSERT INTO products (
-        id, sku, name, brand, slug, category_id, original_price, images, description, status,
+        id, sku, name, brand, slug, category_id, original_price, images, description,
+        down_payment_mode, down_payment_type, down_payment_value, status,
         seo_title, seo_description, seo_keywords, og_image, installment_mode, custom_plan_ids,
         override_plans, sale_page_blocks, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         sku=excluded.sku,
         name=excluded.name,
@@ -62,6 +66,9 @@ export async function POST(req: Request) {
         original_price=excluded.original_price,
         images=excluded.images,
         description=excluded.description,
+        down_payment_mode=excluded.down_payment_mode,
+        down_payment_type=excluded.down_payment_type,
+        down_payment_value=excluded.down_payment_value,
         status=excluded.status,
         seo_title=excluded.seo_title,
         seo_description=excluded.seo_description,
@@ -82,6 +89,9 @@ export async function POST(req: Request) {
         Number(product.original_price) || 0,
         JSON.stringify(product.images || []),
         product.description || '',
+        product.down_payment_mode || 'default',
+        product.down_payment_type || 'percentage',
+        Number(product.down_payment_value) || 0,
         product.status || 'published',
         product.seo_title || '',
         product.seo_description || '',

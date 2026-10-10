@@ -58,6 +58,9 @@ export async function initTursoSchema() {
       images TEXT,
       description TEXT,
       status TEXT DEFAULT 'published',
+      down_payment_mode TEXT DEFAULT 'default',
+      down_payment_type TEXT DEFAULT 'percentage',
+      down_payment_value REAL DEFAULT 0,
       seo_title TEXT,
       seo_description TEXT,
       seo_keywords TEXT,
@@ -89,7 +92,10 @@ export async function initTursoSchema() {
       default_seo_description TEXT,
       default_og_image TEXT,
       address TEXT,
-      footer_note TEXT
+      footer_note TEXT,
+      enable_down_payment INTEGER DEFAULT 0,
+      default_down_payment_type TEXT DEFAULT 'percentage',
+      default_down_payment_value REAL DEFAULT 0
     )
   `);
 }

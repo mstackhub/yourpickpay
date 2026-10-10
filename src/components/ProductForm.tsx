@@ -2,9 +2,9 @@
 
 import React, { useState, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Product, InstallmentPlan, InstallmentMode, ProductStatus } from '@/types';
+import { Product, InstallmentPlan, InstallmentMode, ProductStatus, DownPaymentMode, DownPaymentType } from '@/types';
 import { useStore } from '@/lib/store';
-import { calculateInstallment, getFrequencyThaiLabel } from '@/lib/installmentEngine';
+import { calculateInstallment, getFrequencyThaiLabel, resolveProductDownPayment } from '@/lib/installmentEngine';
 import { 
   Save, 
   ArrowLeft, 
@@ -20,7 +20,9 @@ import {
   UploadCloud,
   FolderOpen,
   Star,
-  ArrowRight
+  ArrowRight,
+  ShieldCheck,
+  Coins
 } from 'lucide-react';
 import { UploadDropzone } from '@/lib/uploadthing';
 
@@ -32,7 +34,7 @@ interface Props {
 export default function ProductForm({ initialProduct, isNew = false }: Props) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { products, categories, plans: globalPlans, saveProduct } = useStore();
+  const { products, categories, plans: globalPlans, settings, saveProduct } = useStore();
 
   const [activeTab, setActiveTab] = useState<'general' | 'images' | 'installment' | 'seo'>('general');
   const [error, setError] = useState('');
@@ -48,6 +50,17 @@ export default function ProductForm({ initialProduct, isNew = false }: Props) {
   const [originalPrice, setOriginalPrice] = useState<number>(initialProduct?.original_price || 0);
   const [description, setDescription] = useState(initialProduct?.description || '');
   const [status, setStatus] = useState<ProductStatus>(initialProduct?.status || 'published');
+
+  // Down Payment State
+  const [downPaymentMode, setDownPaymentMode] = useState<DownPaymentMode>(
+    initialProduct?.down_payment_mode || 'default'
+  );
+  const [downPaymentType, setDownPaymentType] = useState<DownPaymentType>(
+    initialProduct?.down_payment_type || 'percentage'
+  );
+  const [downPaymentValue, setDownPaymentValue] = useState<number>(
+    initialProduct?.down_payment_value ?? 0
+  );
 
   // Images State
   const [images, setImages] = useState<string[]>(initialProduct?.images || []);
@@ -208,6 +221,9 @@ export default function ProductForm({ initialProduct, isNew = false }: Props) {
       installment_mode: installmentMode,
       custom_plan_ids: customPlanIds,
       override_plans: overridePlans,
+      down_payment_mode: downPaymentMode,
+      down_payment_type: downPaymentType,
+      down_payment_value: Number(downPaymentValue) || 0,
       seo_title: seoTitle || `${name} - ผ่อนสินค้าแบรนด์เนมแท้ | Yourpickpay`,
       seo_description: seoDescription || `${name} ของแท้ 100% ผ่อนสบายรายวัน รายเดือน`,
       seo_keywords: seoKeywords,
@@ -264,6 +280,23 @@ export default function ProductForm({ initialProduct, isNew = false }: Props) {
       return base.map((p) => (p.id === id ? { ...p, ...updates } : p));
     });
   };
+
+  const resolvedDownPayment = useMemo(() => {
+    if (downPaymentMode === 'none') {
+      return { mode: 'none' as const, type: 'percentage' as const, value: 0, amount: 0 };
+    }
+    if (downPaymentMode === 'custom') {
+      const val = Number(downPaymentValue) || 0;
+      const amt = downPaymentType === 'percentage'
+        ? Math.round((originalPrice * (val / 100)) * 100) / 100
+        : Math.min(originalPrice, val);
+      return { mode: 'custom' as const, type: downPaymentType, value: val, amount: amt };
+    }
+    return resolveProductDownPayment(
+      { original_price: originalPrice, down_payment_mode: 'default' } as Product,
+      settings
+    );
+  }, [downPaymentMode, downPaymentType, downPaymentValue, originalPrice, settings]);
 
   const applicablePreviewPlans = useMemo(() => {
     if (installmentMode === 'override') {
@@ -659,11 +692,155 @@ export default function ProductForm({ initialProduct, isNew = false }: Props) {
 
         {/* Tab 3: Installment Plans Configuration */}
         {activeTab === 'installment' && (
-          <div className="bg-white p-6 sm:p-8 border border-zinc-200 space-y-6">
-            <div>
-              <label className="block text-xs font-bold text-gray-900 uppercase tracking-wider mb-2">
-                โหมดการผ่อนชำระสำหรับสินค้านี้ (Installment Mode)
-              </label>
+          <div className="bg-white p-6 sm:p-8 border border-zinc-200 space-y-8">
+            
+            {/* Section 1: Down Payment Settings for this Product */}
+            <div className="p-5 sm:p-6 bg-zinc-50 border border-black space-y-5">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 bg-black text-white flex items-center justify-center">
+                    <Coins className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-black uppercase tracking-wider">
+                      1. การตั้งค่าเงินดาวน์สำหรับสินค้านี้ (Down Payment Settings)
+                    </h3>
+                    <p className="text-xs text-zinc-600 font-medium mt-0.5">
+                      เลือกรูปแบบเงินดาวน์ของสินค้านี้ เพื่อคำนวณหักลบก่อนคิดยอดผ่อนต่องวด
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Mode Selection */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {[
+                  {
+                    id: 'default',
+                    title: 'ใช้ค่าเริ่มต้นระบบ (Default)',
+                    desc: settings.enable_down_payment
+                      ? `ระบบตั้งไว้: ${settings.default_down_payment_value}${settings.default_down_payment_type === 'percentage' ? '%' : ' บาท'}`
+                      : 'ระบบตั้งไว้: ปิดการเก็บเงินดาวน์ (ฟรีดาวน์)'
+                  },
+                  {
+                    id: 'custom',
+                    title: 'กำหนดเองเฉพาะสินค้านี้ (Custom)',
+                    desc: 'ระบุยอดดาวน์ % หรือ บาท เฉพาะสินค้านี้'
+                  },
+                  {
+                    id: 'none',
+                    title: 'ฟรีดาวน์ / ไม่ต้องมีเงินดาวน์ (None)',
+                    desc: 'ไม่เก็บเงินดาวน์สำหรับสินค้านี้ ยอดจัดเต็มจำนวน'
+                  }
+                ].map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setDownPaymentMode(m.id as DownPaymentMode)}
+                    className={`p-3.5 text-left border transition-all ${
+                      downPaymentMode === m.id
+                        ? 'border-black bg-black text-white'
+                        : 'border-zinc-300 bg-white text-black hover:border-black'
+                    }`}
+                  >
+                    <div className="font-bold text-xs">{m.title}</div>
+                    <div className={`text-[11px] mt-1 ${downPaymentMode === m.id ? 'text-zinc-300' : 'text-zinc-500'}`}>
+                      {m.desc}
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              {/* Custom Down Payment Config */}
+              {downPaymentMode === 'custom' && (
+                <div className="p-4 bg-white border border-zinc-300 space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-900 uppercase tracking-wider mb-1.5">
+                        รูปแบบการคิดเงินดาวน์ (Down Payment Type)
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setDownPaymentType('percentage')}
+                          className={`py-2 px-3 text-xs font-bold uppercase transition-all border ${
+                            downPaymentType === 'percentage'
+                              ? 'bg-black text-white border-black'
+                              : 'bg-zinc-50 text-zinc-700 border-zinc-300 hover:border-black'
+                          }`}
+                        >
+                          % เปอร์เซ็นต์
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDownPaymentType('fixed')}
+                          className={`py-2 px-3 text-xs font-bold uppercase transition-all border ${
+                            downPaymentType === 'fixed'
+                              ? 'bg-black text-white border-black'
+                              : 'bg-zinc-50 text-zinc-700 border-zinc-300 hover:border-black'
+                          }`}
+                        >
+                          บาท (Fixed THB)
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-900 uppercase tracking-wider mb-1.5">
+                        มูลค่าเงินดาวน์ ({downPaymentType === 'percentage' ? '%' : 'บาท'})
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          step={downPaymentType === 'percentage' ? '0.1' : '1'}
+                          min="0"
+                          value={downPaymentValue}
+                          onChange={(e) => setDownPaymentValue(Number(e.target.value) || 0)}
+                          placeholder={downPaymentType === 'percentage' ? 'เช่น 10' : 'เช่น 1000'}
+                          className="w-full px-4 py-2 bg-zinc-50 border border-zinc-300 text-sm font-bold text-black focus:bg-white focus:border-black focus:outline-none"
+                        />
+                        <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-zinc-500">
+                          {downPaymentType === 'percentage' ? '%' : 'THB'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Live Down Payment Summary */}
+              <div className="p-3.5 bg-white border border-black flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div>
+                  <span className="text-zinc-500 font-medium">ราคาสดเคาน์เตอร์: </span>
+                  <span className="font-bold text-black">฿{originalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+                <div>
+                  <span className="text-zinc-500 font-medium">เงินดาวน์: </span>
+                  <span className="font-black text-black">
+                    ฿{resolvedDownPayment.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {resolvedDownPayment.amount > 0 && resolvedDownPayment.type === 'percentage' && ` (${resolvedDownPayment.value}%)`}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-zinc-500 font-medium">ยอดจัดผ่อนคงเหลือ (Financed): </span>
+                  <span className="font-black text-black text-sm">
+                    ฿{(Math.max(0, originalPrice - resolvedDownPayment.amount)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Section 2: Installment Mode Selection */}
+            <div className="space-y-4 pt-2">
+              <div>
+                <h3 className="text-sm font-bold text-black uppercase tracking-wider mb-1">
+                  2. โหมดแผนการผ่อนชำระสำหรับสินค้านี้ (Installment Mode)
+                </h3>
+                <p className="text-xs text-zinc-600 font-medium">
+                  เลือกว่าสินค้านี้จะใช้แผนผ่อนมาตรฐาน หรือกำหนดอัตราดอกเบี้ยและแผนเฉพาะรายการนี้
+                </p>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {[
                   { id: 'default', title: 'ใช้แผนผ่อนมาตรฐาน (Default)', desc: 'ใช้แผนที่เป็น Default ส่วนกลางทั้งหมดโดยอัตโนมัติ' },
@@ -738,7 +915,7 @@ export default function ProductForm({ initialProduct, isNew = false }: Props) {
                     กำหนดเงื่อนไขผ่อนเฉพาะสินค้านี้ (Override Plans):
                   </span>
                   <span className="text-[11px] text-zinc-500 font-medium">
-                    เลือกว่าจะคิดแบบ % หรือ ยอดคงที่ (Fixed บาท) แยกรายแผนได้
+                    เลือกว่าจะคิดแบบ % หรือ ยอดคงที่ (Fixed บาท) แยกรายแผนได้ (คำนวณจากยอดจัดผ่อน)
                   </span>
                 </div>
 
@@ -759,7 +936,7 @@ export default function ProductForm({ initialProduct, isNew = false }: Props) {
                         {(overridePlans.length > 0 ? overridePlans : globalPlans).map((plan) => {
                           const currentPlan = overridePlans.find(p => p.id === plan.id) || plan;
                           const isPlanActive = Boolean(currentPlan.is_active);
-                          const calc = calculateInstallment(originalPrice || 0, currentPlan, { sku, name });
+                          const calc = calculateInstallment(originalPrice || 0, currentPlan, { sku, name }, resolvedDownPayment);
 
                           return (
                             <tr key={plan.id} className={isPlanActive ? 'bg-white hover:bg-zinc-50' : 'bg-zinc-100 opacity-60'}>
@@ -827,12 +1004,19 @@ export default function ProductForm({ initialProduct, isNew = false }: Props) {
 
             {/* Live simulation of plans for this product */}
             <div className="pt-4 border-t border-zinc-200">
-              <span className="text-xs font-bold text-gray-900 uppercase tracking-wider block mb-3">
-                พรีวิวการคำนวณค่างวดสำหรับสินค้านี้ (คำนวณจากราคาสด ฿{originalPrice.toLocaleString()}.-)
-              </span>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-3">
+                <span className="text-xs font-bold text-gray-900 uppercase tracking-wider block">
+                  พรีวิวการคำนวณค่างวดสำหรับสินค้านี้ (คำนวณจากราคาสด ฿{originalPrice.toLocaleString()}.-)
+                </span>
+                {resolvedDownPayment.amount > 0 && (
+                  <span className="text-xs font-bold text-emerald-700">
+                    *หักเงินดาวน์ ฿{resolvedDownPayment.amount.toLocaleString()} ยอดจัดผ่อน ฿{(Math.max(0, originalPrice - resolvedDownPayment.amount)).toLocaleString()}
+                  </span>
+                )}
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {applicablePreviewPlans.map((p) => {
-                  const calc = calculateInstallment(originalPrice, p, { sku, name });
+                  const calc = calculateInstallment(originalPrice, p, { sku, name }, resolvedDownPayment);
                   return (
                     <div key={p.id} className="p-4 bg-zinc-50 border border-zinc-300 text-xs space-y-1">
                       <div className="font-bold text-black">{p.name}</div>

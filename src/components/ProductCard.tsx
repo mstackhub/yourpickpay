@@ -4,14 +4,14 @@ import React from 'react';
 import Link from 'next/link';
 import { Product } from '@/types';
 import { useStore } from '@/lib/store';
-import { calculateInstallment, getApplicablePlans } from '@/lib/installmentEngine';
+import { calculateInstallment, getApplicablePlans, resolveProductDownPayment } from '@/lib/installmentEngine';
 
 interface Props {
   product: Product;
 }
 
 export default function ProductCard({ product }: Props) {
-  const { plans: allPlans } = useStore();
+  const { plans: allPlans, settings } = useStore();
   
   // Find 6-month daily plan or first active daily plan
   const applicablePlans = getApplicablePlans(product, allPlans);
@@ -19,8 +19,10 @@ export default function ProductCard({ product }: Props) {
     || applicablePlans.find(p => p.frequency === 'daily')
     || applicablePlans[0];
 
+  const downPayment = resolveProductDownPayment(product, settings);
+
   const calc = preferredPlan 
-    ? calculateInstallment(product.original_price, preferredPlan, { sku: product.sku, name: product.name })
+    ? calculateInstallment(product.original_price, preferredPlan, { sku: product.sku, name: product.name }, downPayment)
     : null;
 
   return (

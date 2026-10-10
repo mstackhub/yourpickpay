@@ -1,5 +1,7 @@
 export type InstallmentFrequency = 'daily' | 'weekly' | 'monthly';
 export type MarkupType = 'percentage' | 'fixed';
+export type DownPaymentType = 'percentage' | 'fixed';
+export type DownPaymentMode = 'default' | 'custom' | 'none';
 export type ProductStatus = 'published' | 'draft' | 'archived';
 export type InstallmentMode = 'default' | 'custom' | 'override';
 
@@ -61,18 +63,26 @@ export interface SalePageBlock {
     videoUrl?: string; // YouTube or MP4
     buttonText?: string;
     buttonUrl?: string;
-    buttonStyle?: 'primary' | 'secondary' | 'gold' | 'outline';
+    buttonColor?: string;
+    buttonTextColor?: string;
+    scentNotes?: {
+      topNotes?: string[];
+      middleNotes?: string[];
+      baseNotes?: string[];
+    };
+    topNotes?: string;
+    heartNotes?: string;
+    baseNotes?: string;
+    features?: Array<{
+      title: string;
+      description: string;
+      icon?: string;
+    }>;
     items?: Array<{
       title: string;
       description: string;
       icon?: string;
-      tag?: string;
     }>;
-    scentNotes?: {
-      topNotes: string[];
-      middleNotes: string[];
-      baseNotes: string[];
-    };
     faqs?: Array<{
       question: string;
       answer: string;
@@ -102,6 +112,11 @@ export interface Product {
   description: string;
   status: ProductStatus;
   
+  // Down payment configuration
+  down_payment_mode?: DownPaymentMode; // 'default' | 'custom' | 'none'
+  down_payment_type?: DownPaymentType; // 'percentage' | 'fixed'
+  down_payment_value?: number; // e.g. 10 for 10%, or 1000 for 1000 THB
+
   // SEO
   seo_title?: string;
   seo_description?: string;
@@ -127,11 +142,13 @@ export interface InstallmentCalculationResult {
   frequency: InstallmentFrequency;
   total_periods: number;
   original_price: number;
+  down_payment_amount: number;
+  financed_amount: number;
   markup_amount: number;
   total_installment_price: number;
   installment_per_period: number;
   last_installment_amount: number;
-  period_label: string; // e.g. "THB/day", "THB/week", "THB/month"
+  period_label: string; // e.g. "บาท / วัน", "บาท / สัปดาห์", "บาท / เดือน"
   frequency_th: string; // e.g. "รายวัน", "รายสัปดาห์", "รายเดือน"
   copy_text: string;
   schedule: Array<{
@@ -159,4 +176,9 @@ export interface WebsiteSettings {
   default_og_image?: string;
   address?: string;
   footer_note?: string;
+
+  // Global Down payment settings
+  enable_down_payment?: boolean;
+  default_down_payment_type?: DownPaymentType; // 'percentage' | 'fixed'
+  default_down_payment_value?: number; // e.g. 0 or 10 for 10%
 }

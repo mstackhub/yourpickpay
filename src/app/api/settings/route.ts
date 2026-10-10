@@ -33,6 +33,9 @@ export async function GET() {
       default_og_image: row.default_og_image || initialWebsiteSettings.default_og_image,
       address: row.address || initialWebsiteSettings.address,
       footer_note: row.footer_note || initialWebsiteSettings.footer_note,
+      enable_down_payment: Boolean(row.enable_down_payment),
+      default_down_payment_type: row.default_down_payment_type || 'percentage',
+      default_down_payment_value: Number(row.default_down_payment_value) || 0,
     };
 
     return NextResponse.json(settings);
@@ -50,8 +53,9 @@ export async function POST(req: Request) {
       sql: `INSERT INTO website_settings (
         id, store_name, tagline, logo_url, brand_primary_color, brand_accent_color,
         line_oa_url, line_oa_id, phone_number, facebook_url, instagram_url, tiktok_url,
-        default_seo_title, default_seo_description, default_og_image, address, footer_note
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        default_seo_title, default_seo_description, default_og_image, address, footer_note,
+        enable_down_payment, default_down_payment_type, default_down_payment_value
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         store_name=excluded.store_name,
         tagline=excluded.tagline,
@@ -68,7 +72,10 @@ export async function POST(req: Request) {
         default_seo_description=excluded.default_seo_description,
         default_og_image=excluded.default_og_image,
         address=excluded.address,
-        footer_note=excluded.footer_note`,
+        footer_note=excluded.footer_note,
+        enable_down_payment=excluded.enable_down_payment,
+        default_down_payment_type=excluded.default_down_payment_type,
+        default_down_payment_value=excluded.default_down_payment_value`,
       args: [
         'default',
         settings.store_name,
@@ -86,7 +93,10 @@ export async function POST(req: Request) {
         settings.default_seo_description || '',
         settings.default_og_image || '',
         settings.address || '',
-        settings.footer_note || ''
+        settings.footer_note || '',
+        settings.enable_down_payment ? 1 : 0,
+        settings.default_down_payment_type || 'percentage',
+        Number(settings.default_down_payment_value) || 0
       ]
     });
 
