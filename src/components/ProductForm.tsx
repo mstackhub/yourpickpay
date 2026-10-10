@@ -4,7 +4,7 @@ import React, { useState, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Product, InstallmentPlan, InstallmentMode, ProductStatus } from '@/types';
 import { useStore } from '@/lib/store';
-import { calculateInstallment } from '@/lib/installmentEngine';
+import { calculateInstallment, getFrequencyThaiLabel } from '@/lib/installmentEngine';
 import { 
   Save, 
   ArrowLeft, 
@@ -244,12 +244,37 @@ export default function ProductForm({ initialProduct, isNew = false }: Props) {
     }, 800);
   };
 
+  const handleSelectInstallmentMode = (mode: InstallmentMode) => {
+    setInstallmentMode(mode);
+    if (mode === 'override' && overridePlans.length === 0) {
+      setOverridePlans(
+        globalPlans.map((p) => ({
+          ...p,
+          markup_type: p.markup_type || 'percentage',
+          markup_value: p.markup_value,
+          is_active: p.is_default,
+        }))
+      );
+    }
+  };
+
+  const handleUpdateOverridePlan = (id: string, updates: Partial<InstallmentPlan>) => {
+    setOverridePlans((prev) => {
+      const base = prev.length > 0 ? prev : globalPlans.map(p => ({ ...p, markup_type: p.markup_type || 'percentage', is_active: p.is_default }));
+      return base.map((p) => (p.id === id ? { ...p, ...updates } : p));
+    });
+  };
+
   const applicablePreviewPlans = useMemo(() => {
+    if (installmentMode === 'override') {
+      const activeOverrides = (overridePlans.length > 0 ? overridePlans : globalPlans).filter(p => p.is_active);
+      return activeOverrides;
+    }
     if (installmentMode === 'custom') {
       return globalPlans.filter(p => customPlanIds.includes(p.id) && p.is_active);
     }
     return globalPlans.filter(p => p.is_default && p.is_active);
-  }, [installmentMode, customPlanIds, globalPlans]);
+  }, [installmentMode, overridePlans, customPlanIds, globalPlans]);
 
   return (
     <div className="space-y-6">
@@ -641,14 +666,14 @@ export default function ProductForm({ initialProduct, isNew = false }: Props) {
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {[
-                  { id: 'default', title: 'ใช้แผนผ่อนมาตรฐาน (Default)', desc: 'ใช้แผนที่เป็น Default ทั้งหมดโดยอัตโนมัติ' },
+                  { id: 'default', title: 'ใช้แผนผ่อนมาตรฐาน (Default)', desc: 'ใช้แผนที่เป็น Default ส่วนกลางทั้งหมดโดยอัตโนมัติ' },
                   { id: 'custom', title: 'เลือกเฉพาะบางแผน (Custom)', desc: 'เลือกเฉพาะแผนที่ต้องการเปิดให้สินค้านี้' },
-                  { id: 'override', title: 'กำหนดแผนเฉพาะสินค้านี้ (Override)', desc: 'ปรับแต่งดอกเบี้ยและระยะเวลาเฉพาะสินค้านี้' },
+                  { id: 'override', title: 'กำหนดแผนเฉพาะสินค้านี้ (Override)', desc: 'กำหนด % หรือระบุ Fixed บาท แยกรายแผนสำหรับสินค้านี้' },
                 ].map((mode) => (
                   <button
                     key={mode.id}
                     type="button"
-                    onClick={() => setInstallmentMode(mode.id as any)}
+                    onClick={() => handleSelectInstallmentMode(mode.id as any)}
                     className={`p-4 border text-left transition-all ${
                       installmentMode === mode.id
                         ? 'border-black bg-black text-white'
@@ -695,12 +720,107 @@ export default function ProductForm({ initialProduct, isNew = false }: Props) {
                         <div>
                           <div className="font-bold text-xs">{plan.name}</div>
                           <div className={`text-[10px] ${checked ? 'text-zinc-300' : 'text-gray-500'}`}>
-                            บวกเพิ่ม +{plan.markup_value}{plan.markup_type === 'percentage' ? '%' : ' THB'}
+                            บวกเพิ่ม +{plan.markup_value}{plan.markup_type === 'percentage' ? '%' : ' บาท'}
                           </div>
                         </div>
                       </label>
                     );
                   })}
+                </div>
+              </div>
+            )}
+
+            {/* Override Plan Editor Table */}
+            {installmentMode === 'override' && (
+              <div className="space-y-3 pt-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                  <span className="text-xs font-bold text-gray-900 uppercase tracking-wider block">
+                    กำหนดเงื่อนไขผ่อนเฉพาะสินค้านี้ (Override Plans):
+                  </span>
+                  <span className="text-[11px] text-zinc-500 font-medium">
+                    เลือกว่าจะคิดแบบ % หรือ ยอดคงที่ (Fixed บาท) แยกรายแผนได้
+                  </span>
+                </div>
+
+                <div className="border border-black overflow-hidden bg-white">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-black text-white font-bold uppercase tracking-wider text-[11px]">
+                        <tr>
+                          <th className="py-3 px-3 w-12 text-center">เปิดใช้</th>
+                          <th className="py-3 px-3">ชื่อแผนผ่อน</th>
+                          <th className="py-3 px-3">ความถี่</th>
+                          <th className="py-3 px-3 w-40">รูปแบบคิดเงิน</th>
+                          <th className="py-3 px-3 w-32">มูลค่าบวกเพิ่ม</th>
+                          <th className="py-3 px-3 text-right">ค่างวดต่อรอบ</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-200">
+                        {(overridePlans.length > 0 ? overridePlans : globalPlans).map((plan) => {
+                          const currentPlan = overridePlans.find(p => p.id === plan.id) || plan;
+                          const isPlanActive = Boolean(currentPlan.is_active);
+                          const calc = calculateInstallment(originalPrice || 0, currentPlan, { sku, name });
+
+                          return (
+                            <tr key={plan.id} className={isPlanActive ? 'bg-white hover:bg-zinc-50' : 'bg-zinc-100 opacity-60'}>
+                              <td className="py-3 px-3 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={isPlanActive}
+                                  onChange={(e) => handleUpdateOverridePlan(plan.id, { is_active: e.target.checked })}
+                                  className="w-4 h-4 accent-black"
+                                />
+                              </td>
+                              <td className="py-3 px-3">
+                                <span className="font-bold text-black block">{plan.name}</span>
+                                <span className="text-[10px] text-zinc-400 font-mono">{plan.duration_months} เดือน</span>
+                              </td>
+                              <td className="py-3 px-3">
+                                <span className="border border-zinc-300 font-bold px-2 py-0.5 text-[10px] text-black uppercase">
+                                  {getFrequencyThaiLabel(plan.frequency)}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3">
+                                <select
+                                  disabled={!isPlanActive}
+                                  value={currentPlan.markup_type || 'percentage'}
+                                  onChange={(e) => handleUpdateOverridePlan(plan.id, { markup_type: e.target.value as any })}
+                                  className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 text-xs font-bold text-black focus:outline-none focus:border-black disabled:bg-zinc-200"
+                                >
+                                  <option value="percentage">% เปอร์เซ็นต์</option>
+                                  <option value="fixed">บาท (Fixed THB)</option>
+                                </select>
+                              </td>
+                              <td className="py-3 px-3">
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    type="number"
+                                    step="0.1"
+                                    min="0"
+                                    disabled={!isPlanActive}
+                                    value={currentPlan.markup_value}
+                                    onChange={(e) => handleUpdateOverridePlan(plan.id, { markup_value: Number(e.target.value) || 0 })}
+                                    className="w-20 px-2 py-1.5 bg-zinc-50 border border-zinc-300 text-xs font-black text-black focus:outline-none focus:border-black disabled:bg-zinc-200"
+                                  />
+                                  <span className="text-[10px] font-bold text-zinc-600">
+                                    {currentPlan.markup_type === 'fixed' ? '฿' : '%'}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="py-3 px-3 text-right">
+                                <span className="font-black text-xs text-black block">
+                                  ฿{calc.installment_per_period.toFixed(2)}
+                                </span>
+                                <span className="text-[10px] text-zinc-500">
+                                  {calc.period_label} (รวม ฿{calc.total_installment_price.toLocaleString()})
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             )}

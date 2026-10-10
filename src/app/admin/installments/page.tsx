@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import { useStore } from '@/lib/store';
 import { InstallmentPlan, InstallmentFrequency, MarkupType } from '@/types';
-import { calculateInstallment } from '@/lib/installmentEngine';
+import { calculateInstallment, getFrequencyThaiLabel } from '@/lib/installmentEngine';
 import { 
   Percent, 
   Plus, 
@@ -13,8 +13,10 @@ import {
   X, 
   Calculator, 
   Calendar,
-  Layers
+  Layers,
+  ArrowLeft
 } from 'lucide-react';
+import Link from 'next/link';
 
 export default function AdminInstallmentsPage() {
   const { plans, savePlan, deletePlan } = useStore();
@@ -33,7 +35,7 @@ export default function AdminInstallmentsPage() {
   const [displayOrder, setDisplayOrder] = useState<number>(1);
 
   // Test Simulation Price
-  const [simPrice, setSimPrice] = useState<number>(5200);
+  const [simPrice, setSimPrice] = useState<number>(5700);
 
   const startCreate = () => {
     setName('ผ่อนรายวัน 6 เดือน (180 วัน)');
@@ -52,7 +54,7 @@ export default function AdminInstallmentsPage() {
     setName(plan.name);
     setDurationMonths(plan.duration_months);
     setFrequency(plan.frequency);
-    setMarkupType(plan.markup_type);
+    setMarkupType(plan.markup_type || 'percentage');
     setMarkupValue(plan.markup_value);
     setIsActive(plan.is_active);
     setIsDefault(plan.is_default);
@@ -104,7 +106,7 @@ export default function AdminInstallmentsPage() {
 
   const previewCalc = useMemo(() => {
     return calculateInstallment(simPrice, currentPlanPreview, {
-      sku: 'CX001',
+      sku: 'YPP0001',
       name: 'Dior Sauvage'
     });
   }, [simPrice, currentPlanPreview]);
@@ -112,13 +114,13 @@ export default function AdminInstallmentsPage() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-black pb-4">
         <div>
-          <h1 className="font-display font-black text-2xl sm:text-3xl text-gray-900">
-            เงื่อนไขการผ่อนชำระ (Installment Plans)
+          <h1 className="font-black text-2xl uppercase tracking-tight text-black">
+            เงื่อนไขการผ่อนชำระส่วนกลาง (Global Installment Plans)
           </h1>
-          <p className="text-xs sm:text-sm text-gray-500 mt-1">
-            กำหนดระยะเวลา ความถี่ อัตราบวกเพิ่ม (Markup) และแผนเริ่มต้นสำหรับสินค้าใหม่
+          <p className="text-xs text-gray-500 font-medium mt-1">
+            กำหนดแผนมาตรฐาน (Default) กำหนดยอดบวกเพิ่มได้ทั้ง % (Percentage) หรือ ยอดคงที่ (Fixed THB)
           </p>
         </div>
 
@@ -126,7 +128,7 @@ export default function AdminInstallmentsPage() {
           <button
             type="button"
             onClick={startCreate}
-            className="px-4 py-2.5 bg-brand-900 hover:bg-brand-950 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md flex items-center gap-1.5 transition-all hover:scale-105"
+            className="px-5 py-2.5 bg-black hover:bg-zinc-800 text-white font-bold text-xs uppercase tracking-wider shadow-sm flex items-center gap-1.5 transition-transform active:scale-[0.99]"
           >
             <Plus className="w-4 h-4" />
             <span>สร้างแผนผ่อนใหม่</span>
@@ -136,28 +138,28 @@ export default function AdminInstallmentsPage() {
 
       {/* Inline Create / Edit Form with Live Engine Tester */}
       {(isCreating || editingId) && (
-        <div className="bg-white p-6 sm:p-7 rounded-3xl border-2 border-brand-500 shadow-xl space-y-6">
-          <div className="flex items-center justify-between pb-4 border-b border-gray-100">
+        <div className="bg-white p-6 sm:p-8 border-2 border-black space-y-6">
+          <div className="flex items-center justify-between pb-4 border-b border-zinc-200">
             <div>
-              <h3 className="font-bold text-gray-900 text-base sm:text-lg">
+              <h3 className="font-black text-black text-base sm:text-lg uppercase tracking-wider">
                 {isCreating ? '➕ สร้างแผนผ่อนชำระใหม่' : '✏️ แก้ไขแผนผ่อนชำระ'}
               </h3>
-              <p className="text-xs text-gray-500">ปรับแต่งสูตรคำนวณและดูผลลัพธ์แบบเรียลไทม์</p>
+              <p className="text-xs text-gray-500">กำหนดเงื่อนไขคำนวณและดูผลลัพธ์จำลองแบบเรียลไทม์</p>
             </div>
             <button
               type="button"
               onClick={() => { setIsCreating(false); setEditingId(null); }}
-              className="text-gray-400 hover:text-gray-600"
+              className="p-1 border border-zinc-300 hover:border-black text-zinc-600 hover:text-black"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
-          <form onSubmit={handleSave} className="space-y-5">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <form onSubmit={handleSave} className="space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               <div className="sm:col-span-2">
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
-                  ชื่อแผนผ่อน (Plan Name) <span className="text-rose-500">*</span>
+                <label className="block text-xs font-bold text-gray-900 uppercase tracking-wider mb-1.5">
+                  ชื่อแผนผ่อน (Plan Name) <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -165,18 +167,18 @@ export default function AdminInstallmentsPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="เช่น ผ่อนรายวัน 6 เดือน (180 วัน)"
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold focus:bg-white focus:ring-2 focus:ring-brand-500"
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 text-sm font-bold focus:bg-white focus:border-black focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
+                <label className="block text-xs font-bold text-gray-900 uppercase tracking-wider mb-1.5">
                   ความถี่การชำระ (Frequency)
                 </label>
                 <select
                   value={frequency}
                   onChange={(e) => setFrequency(e.target.value as any)}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold focus:bg-white focus:ring-2 focus:ring-brand-500"
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 text-sm font-semibold focus:bg-white focus:border-black focus:outline-none"
                 >
                   <option value="daily">☀️ รายวัน (Daily - 30 วัน/เดือน)</option>
                   <option value="weekly">📅 รายสัปดาห์ (Weekly - 4 สัปดาห์/เดือน)</option>
@@ -185,7 +187,7 @@ export default function AdminInstallmentsPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
+                <label className="block text-xs font-bold text-gray-900 uppercase tracking-wider mb-1.5">
                   ระยะเวลาสัญญา (เดือน / Months)
                 </label>
                 <input
@@ -195,72 +197,73 @@ export default function AdminInstallmentsPage() {
                   required
                   value={durationMonths}
                   onChange={(e) => setDurationMonths(Number(e.target.value))}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:bg-white focus:ring-2 focus:ring-brand-500"
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 text-sm font-bold focus:bg-white focus:border-black focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
-                  รูปแบบยอดบวกเพิ่ม (Markup Type)
+                <label className="block text-xs font-bold text-gray-900 uppercase tracking-wider mb-1.5">
+                  รูปแบบการคิดเงิน (Markup Type)
                 </label>
                 <select
                   value={markupType}
                   onChange={(e) => setMarkupType(e.target.value as any)}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold focus:bg-white focus:ring-2 focus:ring-brand-500"
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 text-sm font-bold focus:bg-white focus:border-black focus:outline-none"
                 >
                   <option value="percentage">📈 อัตราเปอร์เซ็นต์ (% จากราคาสด)</option>
-                  <option value="fixed">💵 ยอดคงที่ (บาท Fixed Amount)</option>
+                  <option value="fixed">💵 ยอดคงที่ (Fixed THB บนราคาสินค้า)</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
-                  มูลค่าที่บวกเพิ่ม ({markupType === 'percentage' ? '%' : 'บาท'})
+                <label className="block text-xs font-bold text-gray-900 uppercase tracking-wider mb-1.5">
+                  มูลค่าที่บวกเพิ่ม ({markupType === 'percentage' ? '%' : 'บาท THB'})
                 </label>
                 <input
                   type="number"
                   step="0.1"
+                  min="0"
                   required
                   value={markupValue}
                   onChange={(e) => setMarkupValue(Number(e.target.value))}
                   placeholder={markupType === 'percentage' ? '15' : '500'}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-brand-700 focus:bg-white focus:ring-2 focus:ring-brand-500"
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 text-sm font-black text-black focus:bg-white focus:border-black focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
+                <label className="block text-xs font-bold text-gray-900 uppercase tracking-wider mb-1.5">
                   ลำดับการแสดงผล (Display Order)
                 </label>
                 <input
                   type="number"
                   value={displayOrder}
                   onChange={(e) => setDisplayOrder(Number(e.target.value))}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-brand-500"
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 text-sm focus:bg-white focus:border-black focus:outline-none"
                 />
               </div>
 
-              <div className="flex items-center gap-6 sm:col-span-2 pt-2">
-                <label className="flex items-center gap-2 cursor-pointer">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 sm:col-span-3 pt-2 border-t border-zinc-200">
+                <label className="flex items-center gap-2.5 cursor-pointer select-none">
                   <input
                     type="checkbox"
                     checked={isDefault}
                     onChange={(e) => setIsDefault(e.target.checked)}
-                    className="w-4 h-4 rounded text-brand-600 focus:ring-brand-500"
+                    className="w-4 h-4 accent-black"
                   />
-                  <span className="text-xs sm:text-sm font-bold text-gray-800">
-                    ตั้งเป็นแผนเริ่มต้น (Default Plan สำหรับสินค้าใหม่ทุกชิ้น)
+                  <span className="text-xs font-bold text-gray-900">
+                    ตั้งเป็นแผนเริ่มต้น (Default Plan - จะเปิดใช้งานอัตโนมัติกับสินค้าใหม่ทุกชิ้น)
                   </span>
                 </label>
 
-                <label className="flex items-center gap-2 cursor-pointer">
+                <label className="flex items-center gap-2.5 cursor-pointer select-none">
                   <input
                     type="checkbox"
                     checked={isActive}
                     onChange={(e) => setIsActive(e.target.checked)}
-                    className="w-4 h-4 rounded text-brand-600 focus:ring-brand-500"
+                    className="w-4 h-4 accent-black"
                   />
-                  <span className="text-xs sm:text-sm font-bold text-gray-800">
+                  <span className="text-xs font-bold text-gray-900">
                     🟢 เปิดใช้งานแผนนี้
                   </span>
                 </label>
@@ -268,56 +271,56 @@ export default function AdminInstallmentsPage() {
             </div>
 
             {/* Live Calculation Output Sandbox for this formula */}
-            <div className="p-4 bg-brand-50/70 rounded-2xl border border-brand-200 space-y-3">
+            <div className="p-5 bg-zinc-50 border border-black space-y-4">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-brand-900 font-bold text-xs sm:text-sm">
-                  <Calculator className="w-4 h-4 text-brand-600" />
-                  <span>ผลการคำนวณสดจากราคาสดตัวอย่าง: ฿{simPrice.toLocaleString()}.-</span>
+                <div className="flex items-center gap-2 text-black font-bold text-xs uppercase tracking-wider">
+                  <Calculator className="w-4 h-4" />
+                  <span>ผลการคำนวณจำลองจากราคาสด: ฿{simPrice.toLocaleString()}.-</span>
                 </div>
-                <div className="text-[11px] text-gray-500">
-                  จำนวนงวดคำนวณได้: <strong>{previewCalc.total_periods} งวด</strong>
+                <div className="text-xs text-zinc-600 font-semibold">
+                  จำนวนงวด: <strong>{previewCalc.total_periods} งวด</strong>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                <div className="bg-white p-2.5 rounded-xl border border-gray-200">
-                  <span className="text-gray-400 block text-[10px]">ราคาสด</span>
-                  <span className="font-bold text-gray-900">฿{previewCalc.original_price.toLocaleString()}</span>
+                <div className="bg-white p-3 border border-zinc-300">
+                  <span className="text-zinc-500 block text-[10px] uppercase font-bold">ราคาสด</span>
+                  <span className="font-bold text-black text-sm">฿{previewCalc.original_price.toLocaleString()}</span>
                 </div>
-                <div className="bg-white p-2.5 rounded-xl border border-gray-200">
-                  <span className="text-gray-400 block text-[10px]">ยอดบวกเพิ่ม</span>
-                  <span className="font-bold text-brand-700">+฿{previewCalc.markup_amount.toLocaleString()}</span>
+                <div className="bg-white p-3 border border-zinc-300">
+                  <span className="text-zinc-500 block text-[10px] uppercase font-bold">ยอดบวกเพิ่ม ({markupType === 'percentage' ? `${markupValue}%` : `Fixed`})</span>
+                  <span className="font-bold text-black text-sm">+฿{previewCalc.markup_amount.toLocaleString()}</span>
                 </div>
-                <div className="bg-white p-2.5 rounded-xl border border-gray-200">
-                  <span className="text-gray-400 block text-[10px]">ยอดรวมทั้งสิ้น</span>
-                  <span className="font-bold text-brand-950">฿{previewCalc.total_installment_price.toLocaleString()}</span>
+                <div className="bg-white p-3 border border-zinc-300">
+                  <span className="text-zinc-500 block text-[10px] uppercase font-bold">ยอดรวมผ่อนทั้งสิ้น</span>
+                  <span className="font-bold text-black text-sm">฿{previewCalc.total_installment_price.toLocaleString()}</span>
                 </div>
-                <div className="bg-brand-900 text-white p-2.5 rounded-xl">
-                  <span className="text-gold-300 block text-[10px]">ค่างวด</span>
-                  <span className="font-black text-gold-400 text-sm">
+                <div className="bg-black text-white p-3 border border-black">
+                  <span className="text-zinc-300 block text-[10px] uppercase font-bold">ค่างวดต่อรอบ</span>
+                  <span className="font-black text-white text-base">
                     ฿{previewCalc.installment_per_period.toFixed(2)} {previewCalc.period_label}
                   </span>
                 </div>
               </div>
 
-              <div className="text-[10px] text-gray-500 bg-white/80 p-2.5 rounded-xl font-mono whitespace-pre-line border border-brand-100">
+              <div className="text-[11px] text-zinc-700 bg-white p-3 font-mono whitespace-pre-line border border-zinc-300">
                 {previewCalc.copy_text}
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-100">
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-zinc-200">
               <button
                 type="button"
                 onClick={() => { setIsCreating(false); setEditingId(null); }}
-                className="px-4 py-2.5 rounded-xl border border-gray-300 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                className="px-6 py-2.5 border border-black text-xs font-bold uppercase tracking-wider text-black hover:bg-zinc-100"
               >
                 ยกเลิก
               </button>
               <button
                 type="submit"
-                className="px-6 py-2.5 rounded-xl bg-brand-900 text-white font-bold text-xs sm:text-sm hover:bg-brand-950 flex items-center gap-1.5 shadow-md"
+                className="px-8 py-2.5 bg-black text-white font-bold text-xs uppercase tracking-wider hover:bg-zinc-800 flex items-center gap-2 shadow-sm"
               >
-                <Check className="w-4 h-4 text-gold-400" />
+                <Check className="w-4 h-4 text-white" />
                 <span>บันทึกแผนผ่อนชำระ</span>
               </button>
             </div>
@@ -326,10 +329,10 @@ export default function AdminInstallmentsPage() {
       )}
 
       {/* Installment Plans Table */}
-      <div className="bg-white rounded-2xl border border-brand-200/70 shadow-sm overflow-hidden">
+      <div className="bg-white border border-black overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs sm:text-sm">
-            <thead className="bg-gray-50 text-gray-600 font-bold uppercase tracking-wider text-[11px] border-b border-gray-200">
+            <thead className="bg-black text-white font-bold uppercase tracking-wider text-[11px]">
               <tr>
                 <th className="py-3.5 px-4">ชื่อแผนผ่อน</th>
                 <th className="py-3.5 px-4">ความถี่</th>
@@ -341,50 +344,50 @@ export default function AdminInstallmentsPage() {
                 <th className="py-3.5 px-4 text-right">การกระทำ</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-zinc-200">
               {plans.map((p) => {
                 const totalPeriods = p.frequency === 'daily' ? p.duration_months * 30 : p.frequency === 'weekly' ? p.duration_months * 4 : p.duration_months;
 
                 return (
-                  <tr key={p.id} className="hover:bg-brand-50/40 transition-colors">
-                    <td className="py-3.5 px-4">
-                      <span className="font-bold text-gray-900 block">{p.name}</span>
-                      <span className="text-[10px] text-gray-400 font-mono">ID: {p.id}</span>
+                  <tr key={p.id} className="hover:bg-zinc-50 transition-colors">
+                    <td className="py-4 px-4">
+                      <span className="font-bold text-black block">{p.name}</span>
+                      <span className="text-[10px] text-zinc-400 font-mono">ID: {p.id}</span>
                     </td>
-                    <td className="py-3.5 px-4">
-                      <span className="bg-gray-100 font-semibold px-2.5 py-1 rounded-md text-xs text-gray-800 uppercase">
-                        {p.frequency}
+                    <td className="py-4 px-4">
+                      <span className="border border-zinc-300 font-bold px-2.5 py-1 text-xs text-black uppercase">
+                        {getFrequencyThaiLabel(p.frequency)}
                       </span>
                     </td>
-                    <td className="py-3.5 px-4 font-bold text-gray-900">{p.duration_months} เดือน</td>
-                    <td className="py-3.5 px-4 font-semibold text-brand-700">{totalPeriods} งวด</td>
-                    <td className="py-3.5 px-4">
-                      <span className="font-bold text-brand-900 bg-brand-50 px-2 py-0.5 rounded border border-brand-200">
-                        +{p.markup_value}{p.markup_type === 'percentage' ? '%' : ' THB'}
+                    <td className="py-4 px-4 font-bold text-black">{p.duration_months} เดือน</td>
+                    <td className="py-4 px-4 font-semibold text-zinc-700">{totalPeriods} งวด</td>
+                    <td className="py-4 px-4">
+                      <span className="font-bold text-black bg-zinc-100 px-2 py-1 border border-zinc-300">
+                        +{p.markup_value}{p.markup_type === 'percentage' ? '%' : ' บาท'}
                       </span>
                     </td>
-                    <td className="py-3.5 px-4">
+                    <td className="py-4 px-4">
                       {p.is_default ? (
-                        <span className="bg-gray-100 text-black font-bold text-[11px] px-2.5 py-0.5 rounded-full border border-gray-300">
+                        <span className="bg-black text-white font-bold text-[10px] uppercase tracking-wider px-2 py-0.5">
                           Default
                         </span>
                       ) : (
-                        <span className="text-gray-400 text-xs">-</span>
+                        <span className="text-zinc-400 text-xs">-</span>
                       )}
                     </td>
-                    <td className="py-3.5 px-4">
-                      <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
-                        p.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'
+                    <td className="py-4 px-4">
+                      <span className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                        p.is_active ? 'bg-zinc-100 text-black border border-black' : 'bg-zinc-100 text-zinc-400'
                       }`}>
                         {p.is_active ? 'เปิดใช้งาน' : 'ปิด'}
                       </span>
                     </td>
-                    <td className="py-3.5 px-4 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
+                    <td className="py-4 px-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
                         <button
                           type="button"
                           onClick={() => startEdit(p)}
-                          className="p-1.5 rounded-lg bg-gray-100 text-gray-700 hover:bg-brand-50 hover:text-brand-700"
+                          className="p-1.5 border border-black hover:bg-black hover:text-white transition-colors"
                           title="แก้ไข"
                         >
                           <Edit className="w-4 h-4" />
@@ -392,7 +395,7 @@ export default function AdminInstallmentsPage() {
                         <button
                           type="button"
                           onClick={() => handleDelete(p.id, p.name)}
-                          className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100"
+                          className="p-1.5 border border-red-500 text-red-600 hover:bg-red-600 hover:text-white transition-colors"
                           title="ลบ"
                         >
                           <Trash2 className="w-4 h-4" />
