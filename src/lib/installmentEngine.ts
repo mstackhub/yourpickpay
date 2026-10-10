@@ -92,21 +92,22 @@ export function calculateInstallment(
   const lastInstallmentAmount = Math.round((totalInstallmentPrice - sumRegularPeriods) * 100) / 100;
 
   const periodLabel = getPeriodUnitLabel(plan.frequency);
-  const freqCondition = getFrequencyConditionLabel(plan.frequency);
   const freqThai = getFrequencyThaiLabel(plan.frequency);
+  const unitTh = plan.frequency === 'daily' ? 'บาท / วัน' : plan.frequency === 'weekly' ? 'บาท / สัปดาห์' : 'บาท / เดือน';
+  const periodTypeTh = plan.frequency === 'daily' ? 'วัน' : plan.frequency === 'weekly' ? 'สัปดาห์' : 'งวด';
 
   const sku = productInfo?.sku || 'SKU';
   const name = productInfo?.name || 'Product';
   
-  // Generate copy text matching the exact layout in user's image
+  // Generate copy text in clean Thai language
   const copyText = [
-    `Code: ${sku}`,
-    `Name: ${name}`,
-    `Price: ${originalPrice.toLocaleString()}.-`,
-    `Condition: ${freqCondition} duration ${plan.duration_months} Months`,
-    `Installment total: ${totalInstallmentPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} THB`,
-    `Installment: ${regularPerPeriod.toFixed(2)} ${periodLabel}`,
-    `Number of payments: ${totalPeriods} (illustrative, final installment adjusted)`
+    `รหัสสินค้า: ${sku}`,
+    `ชื่อสินค้า: ${name}`,
+    `ราคาสด: ${originalPrice.toLocaleString()} บาท`,
+    `เงื่อนไขการผ่อน: ผ่อน${freqThai} ระยะเวลา ${plan.duration_months} เดือน`,
+    `ยอดผ่อนรวมทั้งหมด: ${totalInstallmentPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท`,
+    `ยอดชำระต่องวด: ${regularPerPeriod.toFixed(2)} ${unitTh}`,
+    `จำนวนงวดชำระ: ${totalPeriods} ${periodTypeTh} (คำนวณโดยประมาณ งวดสุดท้ายอาจมีการปรับเศษสตางค์)`
   ].join('\n');
 
   // Build full payment schedule breakdown
