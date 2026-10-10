@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Product, InstallmentPlan, InstallmentMode, ProductStatus } from '@/types';
 import { useStore } from '@/lib/store';
@@ -17,9 +17,12 @@ import {
   Percent,
   Search,
   Globe,
-  UploadCloud
+  UploadCloud,
+  FolderOpen,
+  Star,
+  ArrowRight
 } from 'lucide-react';
-import { UploadDropzone, UploadButton } from '@/lib/uploadthing';
+import { UploadDropzone } from '@/lib/uploadthing';
 
 interface Props {
   initialProduct?: Product;
@@ -28,11 +31,13 @@ interface Props {
 
 export default function ProductForm({ initialProduct, isNew = false }: Props) {
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { products, categories, plans: globalPlans, saveProduct } = useStore();
 
   const [activeTab, setActiveTab] = useState<'general' | 'images' | 'installment' | 'seo'>('general');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [isProcessingLocal, setIsProcessingLocal] = useState(false);
 
   // Form State
   const [sku, setSku] = useState(initialProduct?.sku || `CX00${products.length + 1}`);
@@ -40,14 +45,12 @@ export default function ProductForm({ initialProduct, isNew = false }: Props) {
   const [brand, setBrand] = useState(initialProduct?.brand || '');
   const [slug, setSlug] = useState(initialProduct?.slug || '');
   const [categoryId, setCategoryId] = useState(initialProduct?.category_id || categories[0]?.id || '');
-  const [originalPrice, setOriginalPrice] = useState<number>(initialProduct?.original_price || 5000);
+  const [originalPrice, setOriginalPrice] = useState<number>(initialProduct?.original_price || 0);
   const [description, setDescription] = useState(initialProduct?.description || '');
   const [status, setStatus] = useState<ProductStatus>(initialProduct?.status || 'published');
 
   // Images State
-  const [images, setImages] = useState<string[]>(initialProduct?.images || [
-    'https://images.unsplash.com/photo-1523293182086-7651a899d37f?w=800&auto=format&fit=crop&q=80'
-  ]);
+  const [images, setImages] = useState<string[]>(initialProduct?.images || []);
   const [newImageUrl, setNewImageUrl] = useState('');
 
   // Installment Mode State
@@ -79,6 +82,74 @@ export default function ProductForm({ initialProduct, isNew = false }: Props) {
     }
   };
 
+  // Local File Upload Handler with Auto-Compression
+  const handleLocalFiles = (files: FileList | File[]) => {
+    if (!files || files.length === 0) return;
+    setIsProcessingLocal(true);
+    setError('');
+
+    const fileArray = Array.from(files);
+    let loadedCount = 0;
+
+    fileArray.forEach((file) => {
+      if (!file.type.startsWith('image/')) {
+        loadedCount++;
+        if (loadedCount === fileArray.length) setIsProcessingLocal(false);
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            const MAX_WIDTH = 1200;
+            const MAX_HEIGHT = 1200;
+            let width = img.width;
+            let height = img.height;
+
+            if (width > height) {
+              if (width > MAX_WIDTH) {
+                height = Math.round(height * (MAX_WIDTH / width));
+                width = MAX_WIDTH;
+              }
+            } else {
+              if (height > MAX_HEIGHT) {
+                width = Math.round(width * (MAX_HEIGHT / height));
+                height = MAX_HEIGHT;
+              }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(img, 0, 0, width, height);
+              const compressed = canvas.toDataURL('image/jpeg', 0.85);
+              setImages((prev) => [...prev, compressed]);
+            } else {
+              setImages((prev) => [...prev, event.target?.result as string]);
+            }
+          } catch (e) {
+            setImages((prev) => [...prev, event.target?.result as string]);
+          } finally {
+            loadedCount++;
+            if (loadedCount === fileArray.length) {
+              setIsProcessingLocal(false);
+            }
+          }
+        };
+        img.onerror = () => {
+          loadedCount++;
+          if (loadedCount === fileArray.length) setIsProcessingLocal(false);
+        };
+        img.src = event.target?.result as string;
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleAddImage = () => {
     if (newImageUrl.trim()) {
       setImages([...images, newImageUrl.trim()]);
@@ -88,6 +159,13 @@ export default function ProductForm({ initialProduct, isNew = false }: Props) {
 
   const handleRemoveImage = (index: number) => {
     setImages(images.filter((_, i) => i !== index));
+  };
+
+  const handleSetCoverImage = (index: number) => {
+    if (index === 0) return;
+    const target = images[index];
+    const rest = images.filter((_, i) => i !== index);
+    setImages([target, ...rest]);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -130,7 +208,7 @@ export default function ProductForm({ initialProduct, isNew = false }: Props) {
       installment_mode: installmentMode,
       custom_plan_ids: customPlanIds,
       override_plans: overridePlans,
-      seo_title: seoTitle || `${name} - ผ่อนน้ำหอมแท้ | Yourpickpay`,
+      seo_title: seoTitle || `${name} - ผ่อนสินค้าแบรนด์เนมแท้ | Yourpickpay`,
       seo_description: seoDescription || `${name} ของแท้ 100% ผ่อนสบายรายวัน รายเดือน`,
       seo_keywords: seoKeywords,
       og_image: ogImage || images[0] || '',
@@ -140,7 +218,7 @@ export default function ProductForm({ initialProduct, isNew = false }: Props) {
           type: 'hero_heading',
           config: {
             title: name,
-            subtitle: 'สัมผัสความหอมระดับเคาน์เตอร์แบรนด์ ผ่อนสบายได้ทุกวัน',
+            subtitle: 'ผ่อนสินค้าแบรนด์เนมแท้ 100% รายวัน รายเดือน อนุมัติไว',
             align: 'center',
             paddingY: 'md'
           }
@@ -163,36 +241,35 @@ export default function ProductForm({ initialProduct, isNew = false }: Props) {
     setSuccess(true);
     setTimeout(() => {
       router.push('/admin/products');
-    }, 600);
+    }, 800);
   };
 
-  // Preview simulation
   const applicablePreviewPlans = useMemo(() => {
-    if (installmentMode === 'override' && overridePlans.length > 0) return overridePlans;
     if (installmentMode === 'custom') {
-      const set = new Set(customPlanIds);
-      return globalPlans.filter(p => set.has(p.id));
+      return globalPlans.filter(p => customPlanIds.includes(p.id) && p.is_active);
     }
-    return globalPlans.filter(p => p.is_default);
-  }, [installmentMode, customPlanIds, overridePlans, globalPlans]);
+    return globalPlans.filter(p => p.is_default && p.is_active);
+  }, [installmentMode, customPlanIds, globalPlans]);
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-black pb-4">
         <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={() => router.back()}
-            className="p-2 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-700"
+            className="p-2 border border-black hover:bg-black hover:text-white transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
           <div>
-            <h1 className="font-display font-black text-2xl sm:text-3xl text-gray-900">
-              {isNew ? 'เพิ่มสินค้าใหม่ (Create Product)' : `แก้ไขสินค้า: ${initialProduct?.name}`}
+            <h1 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-black">
+              {isNew ? 'เพิ่มสินค้าใหม่ (New Product)' : `แก้ไขสินค้า: ${name || initialProduct?.name}`}
             </h1>
-            <p className="text-xs text-gray-500">กำหนดข้อมูล SKU ราคาสด แผนผ่อนชำระ และ Sale Page</p>
+            <p className="text-xs text-gray-500 font-medium mt-0.5">
+              กำหนดรายละเอียดสินค้า ราคาเงินสด เงื่อนไขการผ่อน และรูปภาพ
+            </p>
           </div>
         </div>
 
@@ -200,7 +277,7 @@ export default function ProductForm({ initialProduct, isNew = false }: Props) {
           <button
             type="button"
             onClick={() => router.push(`/admin/sale-page-builder/${initialProduct.id}`)}
-            className="px-3.5 py-2 rounded-xl bg-gold-500 text-brand-950 font-bold text-xs hover:bg-gold-600 flex items-center gap-1.5 shadow-sm"
+            className="px-4 py-2 bg-black text-white font-bold text-xs uppercase tracking-wider hover:bg-zinc-800 flex items-center gap-1.5 shadow-sm"
           >
             <Layers className="w-4 h-4" />
             <span>เข้าสู่ Sale Page Builder</span>
@@ -209,35 +286,35 @@ export default function ProductForm({ initialProduct, isNew = false }: Props) {
       </div>
 
       {error && (
-        <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-xs sm:text-sm text-rose-700 flex items-center gap-2">
-          <AlertCircle className="w-5 h-5 shrink-0" />
+        <div className="p-4 bg-red-50 border border-red-200 text-xs sm:text-sm text-red-700 flex items-center gap-2">
+          <AlertCircle className="w-5 h-5 shrink-0 text-red-600" />
           <span>{error}</span>
         </div>
       )}
 
       {success && (
-        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs sm:text-sm text-emerald-700 flex items-center gap-2">
-          <Check className="w-5 h-5 shrink-0" />
+        <div className="p-4 bg-black text-white text-xs sm:text-sm flex items-center gap-2">
+          <Check className="w-5 h-5 shrink-0 text-white" />
           <span>บันทึกข้อมูลสินค้าสำเร็จแล้ว! กำลังกลับสู่หน้ารายการ...</span>
         </div>
       )}
 
       {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-gray-200 pb-2 overflow-x-auto">
+      <div className="flex items-center gap-1 border-b border-black overflow-x-auto">
         {[
           { id: 'general', label: '1. ข้อมูลทั่วไป (General)' },
-          { id: 'images', label: '2. รูปภาพสินค้า (Images)' },
-          { id: 'installment', label: '3. แผนการผ่อนชำระ (Installment Plans)' },
+          { id: 'images', label: `2. รูปภาพสินค้า (Images) [${images.length}]` },
+          { id: 'installment', label: '3. แผนการผ่อนชำระ (Installments)' },
           { id: 'seo', label: '4. ข้อมูล SEO & Meta' },
         ].map((tab) => (
           <button
             key={tab.id}
             type="button"
             onClick={() => setActiveTab(tab.id as any)}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all shrink-0 ${
+            className={`px-5 py-3 text-xs sm:text-sm font-bold uppercase tracking-wider transition-all shrink-0 border-t border-l border-r ${
               activeTab === tab.id
-                ? 'bg-brand-900 text-white shadow-sm'
-                : 'bg-white text-gray-600 hover:bg-gray-100'
+                ? 'bg-black text-white border-black'
+                : 'bg-zinc-100 text-gray-700 hover:bg-zinc-200 border-transparent'
             }`}
           >
             {tab.label}
@@ -249,11 +326,11 @@ export default function ProductForm({ initialProduct, isNew = false }: Props) {
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Tab 1: General */}
         {activeTab === 'general' && (
-          <div className="bg-white p-6 rounded-2xl border border-brand-200/70 shadow-sm space-y-5">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="bg-white p-6 sm:p-8 border border-zinc-200 space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                  รหัสสินค้า (SKU) <span className="text-rose-500">*ต้องไม่ซ้ำ</span>
+                <label className="block text-xs font-bold text-gray-900 uppercase tracking-wider mb-1.5">
+                  รหัสสินค้า (SKU) <span className="text-red-500">*ต้องไม่ซ้ำ</span>
                 </label>
                 <input
                   type="text"
@@ -261,28 +338,28 @@ export default function ProductForm({ initialProduct, isNew = false }: Props) {
                   value={sku}
                   onChange={(e) => setSku(e.target.value)}
                   placeholder="เช่น CX001, CX002"
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-mono font-bold text-brand-900 focus:bg-white focus:ring-2 focus:ring-brand-500"
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 text-sm font-mono font-bold text-black focus:bg-white focus:border-black focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                  แบรนด์สินค้า (Brand) <span className="text-rose-500">*</span>
+                <label className="block text-xs font-bold text-gray-900 uppercase tracking-wider mb-1.5">
+                  แบรนด์สินค้า (Brand) <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   required
                   value={brand}
                   onChange={(e) => setBrand(e.target.value)}
-                  placeholder="เช่น Dior, Chanel, Creed, YSL"
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:bg-white focus:ring-2 focus:ring-brand-500"
+                  placeholder="เช่น Dior, Chanel, Rolex, Louis Vuitton, YSL"
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 text-sm font-medium focus:bg-white focus:border-black focus:outline-none"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                ชื่อสินค้า (Product Name) <span className="text-rose-500">*</span>
+              <label className="block text-xs font-bold text-gray-900 uppercase tracking-wider mb-1.5">
+                ชื่อสินค้า (Product Name) <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -290,19 +367,19 @@ export default function ProductForm({ initialProduct, isNew = false }: Props) {
                 value={name}
                 onChange={(e) => handleNameChange(e.target.value)}
                 placeholder="เช่น Dior Sauvage Eau de Parfum 100ml"
-                className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:bg-white focus:ring-2 focus:ring-brand-500"
+                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 text-sm font-medium focus:bg-white focus:border-black focus:outline-none"
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-bold text-gray-900 uppercase tracking-wider mb-1.5">
                   หมวดหมู่ (Category)
                 </label>
                 <select
                   value={categoryId}
                   onChange={(e) => setCategoryId(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-brand-500"
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 text-sm font-medium focus:bg-white focus:border-black focus:outline-none"
                 >
                   {categories.map((c) => (
                     <option key={c.id} value={c.id}>{c.name}</option>
@@ -311,27 +388,28 @@ export default function ProductForm({ initialProduct, isNew = false }: Props) {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                  ราคาสดเคาน์เตอร์ปกติ (THB) <span className="text-rose-500">*</span>
+                <label className="block text-xs font-bold text-gray-900 uppercase tracking-wider mb-1.5">
+                  ราคาสดเคาน์เตอร์ปกติ (THB) <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="number"
                   required
-                  value={originalPrice}
+                  min="0"
+                  value={originalPrice || ''}
                   onChange={(e) => setOriginalPrice(Number(e.target.value))}
-                  placeholder="5200"
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-900 focus:bg-white focus:ring-2 focus:ring-brand-500"
+                  placeholder="เช่น 5200"
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 text-sm font-bold text-black focus:bg-white focus:border-black focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-bold text-gray-900 uppercase tracking-wider mb-1.5">
                   สถานะการแสดงผล (Status)
                 </label>
                 <select
                   value={status}
                   onChange={(e) => setStatus(e.target.value as any)}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:bg-white focus:ring-2 focus:ring-brand-500"
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 text-sm font-medium focus:bg-white focus:border-black focus:outline-none"
                 >
                   <option value="published">🟢 เผยแพร่ (Published)</option>
                   <option value="draft">🟡 แบบร่าง (Draft)</option>
@@ -341,11 +419,11 @@ export default function ProductForm({ initialProduct, isNew = false }: Props) {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                Slug URL (Unique Path) <span className="text-rose-500">*</span>
+              <label className="block text-xs font-bold text-gray-900 uppercase tracking-wider mb-1.5">
+                Slug URL (Unique Path) <span className="text-red-500">*</span>
               </label>
               <div className="flex items-center">
-                <span className="bg-gray-100 border border-r-0 border-gray-200 px-3 py-2.5 text-xs text-gray-500 rounded-l-xl">
+                <span className="bg-zinc-100 border border-r-0 border-zinc-300 px-4 py-3 text-xs text-gray-600 font-mono">
                   /product/
                 </span>
                 <input
@@ -354,13 +432,13 @@ export default function ProductForm({ initialProduct, isNew = false }: Props) {
                   value={slug}
                   onChange={(e) => setSlug(e.target.value)}
                   placeholder="dior-sauvage-edp"
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-r-xl text-sm font-mono focus:bg-white focus:ring-2 focus:ring-brand-500"
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 text-sm font-mono focus:bg-white focus:border-black focus:outline-none"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+              <label className="block text-xs font-bold text-gray-900 uppercase tracking-wider mb-1.5">
                 รายละเอียดสินค้า (Product Description)
               </label>
               <textarea
@@ -368,21 +446,92 @@ export default function ProductForm({ initialProduct, isNew = false }: Props) {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="ระบุเรื่องราว ความรู้สึก และจุดเด่นของสินค้า..."
-                className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-brand-500"
+                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 text-sm focus:bg-white focus:border-black focus:outline-none"
               />
+            </div>
+
+            <div className="pt-4 border-t border-zinc-200 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setActiveTab('images')}
+                className="px-5 py-3 bg-black text-white text-xs font-bold uppercase tracking-wider hover:bg-zinc-800 flex items-center gap-2"
+              >
+                <span>ถัดไป: อัปโหลดรูปภาพสินค้า</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
             </div>
           </div>
         )}
 
         {/* Tab 2: Images */}
         {activeTab === 'images' && (
-          <div className="bg-white p-6 rounded-2xl border border-brand-200/70 shadow-sm space-y-6">
-            {/* UploadThing Dropzone */}
+          <div className="bg-white p-6 sm:p-8 border border-zinc-200 space-y-8">
+            {/* Hidden native file input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => handleLocalFiles(e.target.files || [])}
+            />
+
+            {/* Option 1: Native Local File Drag & Drop (Highest Reliability) */}
             <div className="space-y-2">
-              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
-                อัปโหลดรูปภาพผ่าน UploadThing (Cloud Storage)
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold text-gray-900 uppercase tracking-wider">
+                  1. เลือกรูปภาพจากเครื่องคอมพิวเตอร์ / มือถือ (Local Photo Upload)
+                </label>
+                <span className="text-[11px] text-zinc-500 font-medium">รองรับ JPG, PNG, WEBP หลายรูปพร้อมกัน</span>
+              </div>
+
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                    handleLocalFiles(e.dataTransfer.files);
+                  }
+                }}
+                className="border-2 border-dashed border-black p-8 bg-zinc-50 hover:bg-zinc-100 cursor-pointer text-center transition-colors flex flex-col items-center justify-center gap-3"
+              >
+                <div className="w-14 h-14 bg-black text-white flex items-center justify-center">
+                  <FolderOpen className="w-7 h-7" />
+                </div>
+                <div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      fileInputRef.current?.click();
+                    }}
+                    className="px-6 py-2.5 bg-black hover:bg-zinc-800 text-white font-bold text-xs uppercase tracking-wider shadow-sm mb-2"
+                  >
+                    📁 คลิกเพื่อเลือกไฟล์รูปภาพจากเครื่อง
+                  </button>
+                  <p className="text-xs text-zinc-600 font-medium">
+                    หรือลากไฟล์รูปภาพมาวางที่นี่ได้ทันที (Drag & Drop)
+                  </p>
+                </div>
+                {isProcessingLocal && (
+                  <p className="text-xs text-black font-bold animate-pulse">
+                    กำลังประมวลผลรูปภาพ...
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Option 2: Cloud Storage UploadThing */}
+            <div className="pt-6 border-t border-zinc-200 space-y-3">
+              <label className="block text-xs font-bold text-gray-900 uppercase tracking-wider">
+                2. หรืออัปโหลดผ่าน UploadThing (Cloud Storage)
               </label>
-              <div className="border-2 border-dashed border-zinc-300 p-4 bg-zinc-50 flex flex-col items-center justify-center">
+              <div className="border border-zinc-200 p-4 bg-zinc-50">
                 <UploadDropzone
                   endpoint="productImage"
                   onClientUploadComplete={(res) => {
@@ -393,32 +542,35 @@ export default function ProductForm({ initialProduct, isNew = false }: Props) {
                     }
                   }}
                   onUploadError={(error: Error) => {
-                    alert(`เกิดข้อผิดพลาดในการอัปโหลด: ${error.message}`);
+                    console.error('UploadThing error:', error);
+                    // Inform nicely without breaking
+                    alert(`Upload error: ${error.message} - คุณสามารถใช้ตัวเลือกที่ 1 (เลือกรูปจากเครื่อง) เพื่อใส่รูปได้ทันทีครับ`);
                   }}
                   appearance={{
-                    button: "bg-black text-white px-4 py-2 text-xs font-bold uppercase",
+                    button: "bg-black text-white px-5 py-2.5 text-xs font-bold uppercase tracking-wider rounded-none",
                     container: "w-full border-none p-2",
                   }}
                 />
               </div>
             </div>
 
-            <div className="pt-2 border-t border-zinc-100">
-              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                หรือเพิ่ม URL รูปภาพภายนอกโดยตรง
+            {/* Option 3: External URL */}
+            <div className="pt-6 border-t border-zinc-200 space-y-2">
+              <label className="block text-xs font-bold text-gray-900 uppercase tracking-wider mb-1">
+                3. หรือเพิ่มจาก URL รูปภาพภายนอกโดยตรง
               </label>
               <div className="flex gap-2">
                 <input
                   type="url"
                   value={newImageUrl}
                   onChange={(e) => setNewImageUrl(e.target.value)}
-                  placeholder="https://example.com/brand-photo.jpg"
-                  className="flex-1 px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-brand-500"
+                  placeholder="https://images.unsplash.com/photo-... หรือ URL อื่นๆ"
+                  className="flex-1 px-4 py-2.5 bg-zinc-50 border border-zinc-300 text-sm focus:bg-white focus:border-black focus:outline-none font-medium"
                 />
                 <button
                   type="button"
                   onClick={handleAddImage}
-                  className="px-4 py-2.5 bg-brand-800 text-white font-semibold text-xs rounded-xl hover:bg-brand-900 flex items-center gap-1"
+                  className="px-5 py-2.5 bg-black text-white font-bold text-xs uppercase tracking-wider hover:bg-zinc-800 flex items-center gap-1.5"
                 >
                   <Plus className="w-4 h-4" />
                   <span>เพิ่มรูปภาพ</span>
@@ -426,39 +578,65 @@ export default function ProductForm({ initialProduct, isNew = false }: Props) {
               </div>
             </div>
 
-            <div className="pt-2 border-t border-zinc-100">
-              <span className="text-xs font-bold text-gray-700 uppercase tracking-wider block mb-3">
-                รูปภาพของสินค้านี้ ({images.length} รูป)
-              </span>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                {images.map((img, idx) => (
-                  <div key={idx} className="relative aspect-square rounded-2xl border border-gray-200 overflow-hidden bg-gray-50 group">
-                    <img src={img} alt={`Product ${idx + 1}`} className="w-full h-full object-cover" />
-                    {idx === 0 && (
-                      <span className="absolute top-2 left-2 bg-brand-900 text-white text-[10px] font-bold px-2 py-0.5 rounded-md">
-                        รูปหลัก (Cover)
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveImage(idx)}
-                      className="absolute top-2 right-2 p-1.5 bg-rose-600 text-white rounded-lg shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
-                      title="ลบรูปภาพนี้"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
+            {/* Image Preview Grid */}
+            <div className="pt-6 border-t border-zinc-200">
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+                  รูปภาพของสินค้านี้ ({images.length} รูป)
+                </span>
+                {images.length > 0 && (
+                  <span className="text-[11px] text-zinc-500 font-medium">
+                    *รูปแรกซ้ายสุดคือ "รูปหน้าปก (Cover Image)" ของสินค้า
+                  </span>
+                )}
               </div>
+
+              {images.length === 0 ? (
+                <div className="p-8 border border-zinc-200 text-center text-zinc-400 text-xs">
+                  ยังไม่มีรูปภาพ กรุณาเลือกรูปภาพจากเครื่องคอมพิวเตอร์ด้านบน
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  {images.map((img, idx) => (
+                    <div key={idx} className="relative aspect-square border border-black overflow-hidden bg-zinc-100 group">
+                      <img src={img} alt={`Product ${idx + 1}`} className="w-full h-full object-cover" />
+                      
+                      {idx === 0 ? (
+                        <div className="absolute top-2 left-2 bg-black text-white text-[10px] font-black px-2 py-1 uppercase tracking-wider flex items-center gap-1 shadow-md">
+                          <Star className="w-3 h-3 fill-white" />
+                          <span>รูปหน้าปก (Cover)</span>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleSetCoverImage(idx)}
+                          className="absolute bottom-2 left-2 bg-black/80 hover:bg-black text-white text-[10px] font-bold px-2 py-1 transition-opacity opacity-0 group-hover:opacity-100"
+                        >
+                          ตั้งเป็นรูปหน้าปก
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveImage(idx)}
+                        className="absolute top-2 right-2 p-1.5 bg-red-600 hover:bg-red-700 text-white shadow-md transition-opacity opacity-0 group-hover:opacity-100"
+                        title="ลบรูปภาพนี้"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
 
         {/* Tab 3: Installment Plans Configuration */}
         {activeTab === 'installment' && (
-          <div className="bg-white p-6 rounded-2xl border border-brand-200/70 shadow-sm space-y-6">
+          <div className="bg-white p-6 sm:p-8 border border-zinc-200 space-y-6">
             <div>
-              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+              <label className="block text-xs font-bold text-gray-900 uppercase tracking-wider mb-2">
                 โหมดการผ่อนชำระสำหรับสินค้านี้ (Installment Mode)
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -471,14 +649,16 @@ export default function ProductForm({ initialProduct, isNew = false }: Props) {
                     key={mode.id}
                     type="button"
                     onClick={() => setInstallmentMode(mode.id as any)}
-                    className={`p-4 rounded-2xl border text-left transition-all ${
+                    className={`p-4 border text-left transition-all ${
                       installmentMode === mode.id
-                        ? 'border-brand-600 bg-brand-50/80 shadow-sm ring-2 ring-brand-500/20'
-                        : 'border-gray-200 bg-white hover:border-gray-300'
+                        ? 'border-black bg-black text-white'
+                        : 'border-zinc-300 bg-white text-black hover:border-black'
                     }`}
                   >
-                    <div className="font-bold text-gray-900 text-xs sm:text-sm">{mode.title}</div>
-                    <div className="text-[11px] text-gray-500 mt-1">{mode.desc}</div>
+                    <div className="font-bold text-xs sm:text-sm">{mode.title}</div>
+                    <div className={`text-[11px] mt-1 ${installmentMode === mode.id ? 'text-zinc-300' : 'text-gray-500'}`}>
+                      {mode.desc}
+                    </div>
                   </button>
                 ))}
               </div>
@@ -486,18 +666,18 @@ export default function ProductForm({ initialProduct, isNew = false }: Props) {
 
             {/* Custom Plan Selector Checkboxes */}
             {installmentMode === 'custom' && (
-              <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200 space-y-3">
-                <span className="text-xs font-bold text-gray-700 uppercase tracking-wider block">
+              <div className="p-5 bg-zinc-50 border border-zinc-300 space-y-3">
+                <span className="text-xs font-bold text-gray-900 uppercase tracking-wider block">
                   เลือกแผนผ่อนที่เปิดให้สินค้านี้:
                 </span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {globalPlans.map((plan) => {
                     const checked = customPlanIds.includes(plan.id);
                     return (
                       <label
                         key={plan.id}
-                        className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
-                          checked ? 'bg-brand-50 border-brand-300' : 'bg-white border-gray-200'
+                        className={`flex items-center gap-3 p-3.5 border cursor-pointer transition-all ${
+                          checked ? 'bg-black text-white border-black' : 'bg-white text-black border-zinc-300'
                         }`}
                       >
                         <input
@@ -510,11 +690,11 @@ export default function ProductForm({ initialProduct, isNew = false }: Props) {
                               setCustomPlanIds(customPlanIds.filter(id => id !== plan.id));
                             }
                           }}
-                          className="rounded text-brand-600 focus:ring-brand-500"
+                          className="w-4 h-4 accent-black"
                         />
                         <div>
-                          <div className="font-bold text-xs text-gray-900">{plan.name}</div>
-                          <div className="text-[10px] text-gray-500">
+                          <div className="font-bold text-xs">{plan.name}</div>
+                          <div className={`text-[10px] ${checked ? 'text-zinc-300' : 'text-gray-500'}`}>
                             บวกเพิ่ม +{plan.markup_value}{plan.markup_type === 'percentage' ? '%' : ' THB'}
                           </div>
                         </div>
@@ -526,20 +706,20 @@ export default function ProductForm({ initialProduct, isNew = false }: Props) {
             )}
 
             {/* Live simulation of plans for this product */}
-            <div className="pt-4 border-t border-gray-100">
-              <span className="text-xs font-bold text-gray-700 uppercase tracking-wider block mb-3">
+            <div className="pt-4 border-t border-zinc-200">
+              <span className="text-xs font-bold text-gray-900 uppercase tracking-wider block mb-3">
                 พรีวิวการคำนวณค่างวดสำหรับสินค้านี้ (คำนวณจากราคาสด ฿{originalPrice.toLocaleString()}.-)
               </span>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {applicablePreviewPlans.map((p) => {
                   const calc = calculateInstallment(originalPrice, p, { sku, name });
                   return (
-                    <div key={p.id} className="p-3.5 bg-brand-50/50 rounded-xl border border-brand-200 text-xs space-y-1">
-                      <div className="font-bold text-gray-900">{p.name}</div>
-                      <div className="text-brand-800 font-extrabold text-sm">
+                    <div key={p.id} className="p-4 bg-zinc-50 border border-zinc-300 text-xs space-y-1">
+                      <div className="font-bold text-black">{p.name}</div>
+                      <div className="text-black font-black text-base">
                         ฿{calc.installment_per_period.toFixed(2)} {calc.period_label}
                       </div>
-                      <div className="text-[10px] text-gray-500">
+                      <div className="text-[10px] text-zinc-500">
                         ยอดรวม: ฿{calc.total_installment_price.toLocaleString()} ({calc.total_periods} งวด)
                       </div>
                     </div>
@@ -552,9 +732,9 @@ export default function ProductForm({ initialProduct, isNew = false }: Props) {
 
         {/* Tab 4: SEO Metadata */}
         {activeTab === 'seo' && (
-          <div className="bg-white p-6 rounded-2xl border border-brand-200/70 shadow-sm space-y-5">
+          <div className="bg-white p-6 sm:p-8 border border-zinc-200 space-y-5">
             <div>
-              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+              <label className="block text-xs font-bold text-gray-900 uppercase tracking-wider mb-1.5">
                 SEO Meta Title
               </label>
               <input
@@ -562,12 +742,12 @@ export default function ProductForm({ initialProduct, isNew = false }: Props) {
                 value={seoTitle}
                 onChange={(e) => setSeoTitle(e.target.value)}
                 placeholder={`${name || 'ชื่อสินค้า'} - ผ่อนสินค้าแบรนด์เนมแท้เริ่มต้นหลักสิบบาท | Yourpickpay`}
-                className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-brand-500"
+                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 text-sm focus:bg-white focus:border-black focus:outline-none"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+              <label className="block text-xs font-bold text-gray-900 uppercase tracking-wider mb-1.5">
                 SEO Meta Description
               </label>
               <textarea
@@ -575,12 +755,12 @@ export default function ProductForm({ initialProduct, isNew = false }: Props) {
                 value={seoDescription}
                 onChange={(e) => setSeoDescription(e.target.value)}
                 placeholder="ผ่อนสินค้าแบรนด์เนมของแท้เคาน์เตอร์ 100% รายวัน รายสัปดาห์ รายเดือน อนุมัติไว..."
-                className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-brand-500"
+                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 text-sm focus:bg-white focus:border-black focus:outline-none"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+              <label className="block text-xs font-bold text-gray-900 uppercase tracking-wider mb-1.5">
                 SEO Keywords (คั่นด้วยจุลภาค)
               </label>
               <input
@@ -588,12 +768,12 @@ export default function ProductForm({ initialProduct, isNew = false }: Props) {
                 value={seoKeywords}
                 onChange={(e) => setSeoKeywords(e.target.value)}
                 placeholder="ผ่อนแบรนด์เนม, แบรนด์เนมแท้ผ่อนได้"
-                className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-brand-500"
+                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 text-sm focus:bg-white focus:border-black focus:outline-none"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+              <label className="block text-xs font-bold text-gray-900 uppercase tracking-wider mb-1.5">
                 OpenGraph Share Image URL
               </label>
               <input
@@ -601,26 +781,26 @@ export default function ProductForm({ initialProduct, isNew = false }: Props) {
                 value={ogImage}
                 onChange={(e) => setOgImage(e.target.value)}
                 placeholder="https://example.com/og-image.jpg"
-                className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-brand-500"
+                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 text-sm focus:bg-white focus:border-black focus:outline-none"
               />
             </div>
           </div>
         )}
 
         {/* Submit Bar */}
-        <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
+        <div className="flex items-center justify-end gap-3 pt-6 border-t border-black">
           <button
             type="button"
             onClick={() => router.back()}
-            className="px-5 py-2.5 rounded-xl border border-gray-300 text-gray-700 text-xs sm:text-sm font-semibold hover:bg-gray-50"
+            className="px-6 py-3 border border-black text-black text-xs font-bold uppercase tracking-wider hover:bg-zinc-100 transition-colors"
           >
             ยกเลิก
           </button>
           <button
             type="submit"
-            className="px-6 py-2.5 rounded-xl bg-brand-900 hover:bg-brand-950 text-white text-xs sm:text-sm font-bold shadow-md flex items-center gap-2"
+            className="px-8 py-3 bg-black hover:bg-zinc-800 text-white text-xs font-bold uppercase tracking-wider shadow-md flex items-center gap-2 transition-transform active:scale-[0.99]"
           >
-            <Save className="w-4 h-4 text-gold-400" />
+            <Save className="w-4 h-4 text-white" />
             <span>บันทึกข้อมูลสินค้า (Save Product)</span>
           </button>
         </div>
