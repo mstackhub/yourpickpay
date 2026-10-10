@@ -85,6 +85,28 @@ export const initialInstallmentPlans: InstallmentPlan[] = [
     is_default: true,
     display_order: 7,
   },
+  {
+    id: 'plan-8',
+    name: 'ผ่อนรายสัปดาห์ 2 เดือน (9 สัปดาห์)',
+    duration_months: 2,
+    frequency: 'weekly',
+    markup_type: 'percentage',
+    markup_value: 10,
+    is_active: true,
+    is_default: true,
+    display_order: 8,
+  },
+  {
+    id: 'plan-9',
+    name: 'ผ่อนรายเดือน 2 เดือน (2 งวด)',
+    duration_months: 2,
+    frequency: 'monthly',
+    markup_type: 'percentage',
+    markup_value: 10,
+    is_active: true,
+    is_default: true,
+    display_order: 9,
+  },
 ];
 
 export const initialWebsiteSettings: WebsiteSettings = {

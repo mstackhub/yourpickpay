@@ -46,7 +46,21 @@ export default function InstallmentCalculatorWidget({ product, className = '', i
       p => p.duration_months === selectedDuration && p.frequency === selectedFrequency
     );
     if (!match) {
-      match = applicablePlans.find(p => p.frequency === selectedFrequency) || applicablePlans[0];
+      const durationPlan = applicablePlans.find(p => p.duration_months === selectedDuration);
+      const fallbackMarkup = durationPlan ? durationPlan.markup_value : (selectedDuration === 2 ? 10 : selectedDuration === 3 ? 8 : 12);
+      const fallbackMarkupType = durationPlan ? durationPlan.markup_type : 'percentage';
+
+      match = {
+        id: `plan-auto-${selectedDuration}-${selectedFrequency}`,
+        name: `ผ่อน${getFrequencyThaiLabel(selectedFrequency)} ${selectedDuration} เดือน`,
+        duration_months: selectedDuration,
+        frequency: selectedFrequency,
+        markup_type: fallbackMarkupType,
+        markup_value: fallbackMarkup,
+        is_active: true,
+        is_default: true,
+        display_order: 99
+      };
     }
     return match;
   }, [applicablePlans, selectedDuration, selectedFrequency]);
