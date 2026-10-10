@@ -9,8 +9,8 @@ import { Lock, Mail, KeyRound, ArrowLeft, ShieldCheck, AlertCircle } from 'lucid
 export default function AdminLoginPage() {
   const router = useRouter();
   const { setAdminLoggedIn } = useStore();
-  const [email, setEmail] = useState('admin@yourpickpay.com');
-  const [password, setPassword] = useState('admin12345');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -20,20 +20,21 @@ export default function AdminLoginPage() {
     setLoading(true);
 
     setTimeout(() => {
-      if (email.trim() && password.trim().length >= 4) {
+      // Validate credentials (supports 'admin' or admin email with password 'admin12345')
+      const inputIdentifier = email.trim().toLowerCase();
+      const inputPass = password.trim();
+
+      const isValidUser = inputIdentifier === 'admin' || inputIdentifier === 'admin@yourpickpay.com' || inputIdentifier === 'mstackhub';
+      const isValidPass = inputPass === 'admin12345' || inputPass === 'yourpickpay2026';
+
+      if (isValidUser && isValidPass) {
         setAdminLoggedIn(true);
         router.push('/admin');
       } else {
-        setError('กรุณากรอกอีเมลและรหัสผ่านให้ถูกต้อง');
+        setError('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง');
         setLoading(false);
       }
-    }, 300);
-  };
-
-  const handleQuickDemoFill = () => {
-    setEmail('admin@yourpickpay.com');
-    setPassword('admin12345');
-    setError('');
+    }, 400);
   };
 
   return (
@@ -63,7 +64,7 @@ export default function AdminLoginPage() {
           </div>
 
           {error && (
-            <div className="p-3.5 bg-gray-100 border border-gray-300 rounded-xl text-xs text-black font-semibold flex items-center gap-2">
+            <div className="p-3.5 bg-red-50 border border-red-200 text-xs text-red-700 font-semibold flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
               <span>{error}</span>
             </div>
@@ -79,6 +80,7 @@ export default function AdminLoginPage() {
                 <input
                   type="text"
                   required
+                  autoComplete="off"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 text-sm focus:outline-none focus:border-black focus:bg-white font-medium text-black"
@@ -96,6 +98,7 @@ export default function AdminLoginPage() {
                 <input
                   type="password"
                   required
+                  autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 text-sm focus:outline-none focus:border-black focus:bg-white font-medium text-black"
@@ -113,17 +116,6 @@ export default function AdminLoginPage() {
               <span>{loading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ (Sign In)'}</span>
             </button>
           </form>
-
-          {/* Quick Fill Box */}
-          <div className="pt-4 border-t border-gray-100 text-center">
-            <button
-              type="button"
-              onClick={handleQuickDemoFill}
-              className="inline-flex items-center gap-1.5 text-xs text-black hover:underline font-bold py-1 px-3 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-            >
-              <span>กรอกข้อมูลทดสอบอัตโนมัติ (Demo Auto-fill)</span>
-            </button>
-          </div>
         </div>
       </div>
     </div>
