@@ -24,43 +24,39 @@ export default function FormattedDescription({ text }: Props) {
     });
   }
 
-  // Remove matched specs from body to avoid repeating if desired, or keep text clean
-  // Let's split into paragraphs or intelligently split inline bullets
   let paragraphs = cleanText.split(/\n+/).map((p) => p.trim()).filter(Boolean);
 
   return (
-    <div className="bg-zinc-50 p-6 border border-zinc-200 space-y-5">
-      <div className="flex items-center justify-between border-b border-zinc-200 pb-3">
-        <span className="font-black text-sm text-black uppercase tracking-wider flex items-center gap-2">
-          <span>เกี่ยวกับสินค้านี้ (Product Details)</span>
+    <div className="bg-white p-5 sm:p-6 rounded-2xl border border-zinc-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)] space-y-4">
+      <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
+        <span className="font-extrabold text-xs sm:text-sm text-zinc-950 uppercase tracking-wider flex items-center gap-2">
+          <span>รายละเอียดสินค้า (Product Details)</span>
         </span>
       </div>
 
-      <div className="space-y-4 text-xs sm:text-sm text-zinc-800 leading-relaxed font-normal">
+      <div className="space-y-3.5 text-xs sm:text-sm text-zinc-800 leading-relaxed font-normal">
         {paragraphs.map((p, pIdx) => {
-          // Check if paragraph contains inline dash bullets like "จุดเด่น - ข้อ 1 - ข้อ 2"
           if (p.includes(' - ') || p.includes(' • ') || p.startsWith('-') || p.startsWith('•')) {
             const parts = p.split(/\s*[\-\•]\s+/).filter(Boolean);
             const titlePart = p.startsWith('-') || p.startsWith('•') ? null : parts[0];
             const bulletParts = titlePart ? parts.slice(1) : parts;
 
             return (
-              <div key={pIdx} className="space-y-2.5">
+              <div key={pIdx} className="space-y-2">
                 {titlePart && (
-                  <p className="font-bold text-black">
+                  <p className="font-bold text-zinc-950">
                     {titlePart.replace(/(ขนาด|ประเภท|ความจุ).*/i, '').trim()}
                   </p>
                 )}
                 {bulletParts.length > 0 && (
-                  <ul className="space-y-2 pl-1">
+                  <ul className="space-y-1.5 pl-1">
                     {bulletParts.map((item, bIdx) => {
-                      // Filter out trailing specs if they were caught in the bullet
                       const cleanItem = item.replace(/(ขนาด|ประเภท|ความจุ)\s*[:：].*/i, '').trim();
                       if (!cleanItem) return null;
 
                       return (
-                        <li key={bIdx} className="flex items-start gap-2.5">
-                          <span className="w-1.5 h-1.5 bg-black shrink-0 mt-2" />
+                        <li key={bIdx} className="flex items-start gap-2">
+                          <span className="w-1.5 h-1.5 rounded-full bg-zinc-950 shrink-0 mt-2" />
                           <span className="text-zinc-700">{cleanItem}</span>
                         </li>
                       );
@@ -81,7 +77,7 @@ export default function FormattedDescription({ text }: Props) {
 
       {/* Specifications Badges */}
       {specs.length > 0 && (
-        <div className="pt-4 border-t border-zinc-200">
+        <div className="pt-3 border-t border-zinc-100">
           <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block mb-2">
             ข้อมูลจำเพาะ (Specifications)
           </span>
@@ -89,10 +85,10 @@ export default function FormattedDescription({ text }: Props) {
             {specs.map((spec, sIdx) => (
               <div
                 key={sIdx}
-                className="inline-flex items-center gap-2 bg-white px-3 py-1.5 border border-zinc-300 text-xs shadow-xs"
+                className="inline-flex items-center gap-1.5 bg-zinc-50 px-2.5 py-1 rounded-lg border border-zinc-200 text-xs"
               >
-                <span className="font-bold text-black">{spec.label}:</span>
-                <span className="text-zinc-700 font-medium">{spec.value}</span>
+                <span className="font-bold text-zinc-900">{spec.label}:</span>
+                <span className="text-zinc-600 font-medium">{spec.value}</span>
               </div>
             ))}
           </div>

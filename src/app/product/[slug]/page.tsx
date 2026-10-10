@@ -68,21 +68,27 @@ export default function ProductDetailPage() {
       {/* 1. Breadcrumbs */}
       <div className="bg-white border-b border-zinc-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-          <nav className="flex items-center justify-between gap-2 text-xs text-zinc-500 font-medium">
-            <div className="flex items-center gap-1.5 overflow-hidden whitespace-nowrap text-ellipsis">
-              <Link href="/" className="hover:text-black transition-colors shrink-0">
+          <nav className="flex items-center justify-between gap-3 text-xs text-zinc-500 font-medium">
+            <div className="flex items-center gap-1.5 overflow-x-auto whitespace-nowrap scrollbar-none flex-1 min-w-0 py-0.5">
+              <Link 
+                href="/" 
+                className="hover:text-black transition-colors shrink-0 whitespace-nowrap inline-block text-zinc-600"
+              >
                 หน้าแรก
               </Link>
               <ChevronRight className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
               {product.category_id && (
                 <>
-                  <Link href={`/?category=${product.category_id}`} className="hover:text-black transition-colors shrink-0">
+                  <Link 
+                    href={`/?category=${product.category_id}`} 
+                    className="hover:text-black transition-colors shrink-0 whitespace-nowrap inline-block text-zinc-600"
+                  >
                     {product.category_name || 'หมวดหมู่'}
                   </Link>
                   <ChevronRight className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
                 </>
               )}
-              <span className="font-bold text-zinc-950 truncate max-w-[140px] sm:max-w-md">
+              <span className="font-bold text-zinc-950 shrink-0 whitespace-nowrap max-w-[180px] sm:max-w-md truncate">
                 {product.name}
               </span>
             </div>
@@ -90,7 +96,7 @@ export default function ProductDetailPage() {
             <button
               type="button"
               onClick={handleShareLink}
-              className="flex items-center gap-1.5 text-xs text-zinc-800 hover:text-black bg-zinc-50 hover:bg-zinc-100 px-3 py-1.5 rounded-lg border border-zinc-200 transition-all font-semibold shrink-0 active:scale-95"
+              className="flex items-center gap-1.5 text-xs text-zinc-800 hover:text-black bg-zinc-50 hover:bg-zinc-100 px-3 py-1.5 rounded-lg border border-zinc-200 transition-all font-semibold shrink-0 whitespace-nowrap active:scale-95 ml-auto"
             >
               {shareCopied ? (
                 <>
